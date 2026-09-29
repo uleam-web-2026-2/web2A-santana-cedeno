@@ -1,48 +1,38 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"mesa-ayuda/internal/middleware"
+	"mesa-ayuda/internal/respuesta"
+	"mesa-ayuda/internal/tickets"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
-	db, err := sql.Open(
-		"pgx",
-		"postgres://postgres:admin123@localhost:5432/mesa_ayuda",
-	)
+	r := chi.NewRouter()
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Middleware en orden
+	r.Use(middleware.Registro)
+	r.Use(middleware.Recuperacion)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{"estado":"vivo"}`)
+	// Sobrescribir 404 y 405
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		respuesta.Error(w, http.StatusNotFound, "ruta_inexistente", "la ruta no existe")
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		respuesta.Error(w, http.StatusMethodNotAllowed, "metodo_no_permitido",
+			"el método no está permitido en esta ruta")
 	})
 
-	http.HandleFunc("/salud", func(w http.ResponseWriter, r *http.Request) {
-		var version string
+	almacen := tickets.NuevoAlmacen()
+	r.Get("/tickets", almacen.Listar)
+	r.Post("/tickets", almacen.Crear)
+	r.Get("/tickets/{id}", almacen.Obtener)
+	r.Get("/explotar", tickets.Explotar)
 
-		if err := db.QueryRow("select version()").Scan(&version); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(
-				w,
-				`{"bd":"sin conexion","detalle":%q}`,
-				err.Error(),
-			)
-			return
-		}
-
-		fmt.Fprintf(
-			w,
-			`{"bd":"ok","version":%q}`,
-			version,
-		)
-	})
-
-	log.Println("Servidor escuchando en :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Println("Servidor mesa de ayuda en :8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
