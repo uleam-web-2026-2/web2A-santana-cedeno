@@ -46,8 +46,7 @@
 
 ## D. Boceto de la pantalla principal
 
-<!-- La pantalla que consume el endpoint de listado. A mano y fotografiada, o en cualquier herramienta.
-     Tiene que verse qué campos muestra y dónde aparece el estado. -->
+
 
 ![Boceto](hito1_boceto.png)
 
@@ -63,7 +62,7 @@ sequenceDiagram
 
 ## F. Capturas de respuestas
 
-<!-- Dos capturas: una petición que sale bien y una que falla la validación. Que se vea el código. -->
+
 
 **Caso correcto:** ![Respuesta correcta](hito1_respuesta_ok.png)
 
