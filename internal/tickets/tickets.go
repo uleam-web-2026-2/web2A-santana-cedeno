@@ -64,6 +64,22 @@ type entradaCrear struct {
 
 var prioridadesValidas = map[string]bool{"baja": true, "media": true, "alta": true}
 
+// Máquina de estados
+var siguientes = map[string][]string{
+	"abierto":    {"en_proceso"},
+	"en_proceso": {"cerrado"},
+	"cerrado":    {},
+}
+
+func puedePasar(de, a string) bool {
+	for _, s := range siguientes[de] {
+		if s == a {
+			return true
+		}
+	}
+	return false
+}
+
 // Handlers
 func (a *Almacen) Listar(w http.ResponseWriter, r *http.Request) {
 	respuesta.Exito(w, http.StatusOK, a.listar())
@@ -103,6 +119,46 @@ func (a *Almacen) Crear(w http.ResponseWriter, r *http.Request) {
 	}
 	t := a.crear(titulo, entrada.Prioridad)
 	respuesta.Exito(w, http.StatusCreated, t)
+}
+
+// Nuevo handler: actualizar estado
+func (a *Almacen) ActualizarEstado(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil || id <= 0 {
+		respuesta.Error(w, http.StatusBadRequest, "id_invalido", "el id debe ser un entero positivo")
+		return
+	}
+
+	var body struct {
+		Estado string `json:"estado"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		respuesta.Error(w, http.StatusBadRequest, "cuerpo_malformado", "el cuerpo debe ser JSON con campo estado")
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	t, ok := a.items[id]
+	if !ok {
+		respuesta.Error(w, http.StatusNotFound, "no_encontrado", "no existe un ticket con ese id")
+		return
+	}
+
+	if _, existe := siguientes[body.Estado]; !existe {
+		respuesta.Error(w, http.StatusUnprocessableEntity, "estado_invalido", "ese estado no existe en la máquina")
+		return
+	}
+
+	if !puedePasar(t.Estado, body.Estado) {
+		respuesta.Error(w, http.StatusUnprocessableEntity, "transicion_invalida",
+			"no se puede pasar de "+t.Estado+" a "+body.Estado)
+		return
+	}
+
+	t.Estado = body.Estado
+	a.items[id] = t
+	respuesta.Exito(w, http.StatusOK, t)
 }
 
 // Ruta de prueba para provocar pánico

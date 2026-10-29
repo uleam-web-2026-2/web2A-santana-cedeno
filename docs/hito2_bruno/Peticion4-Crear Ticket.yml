@@ -1,0 +1,27 @@
+info:
+  name: Peticion4-Crear Ticket
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: http://localhost:8080/tickets
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "titulo": "Problema con las vitaminas",
+        "descripcion": "La vitaminas estan expiradas",
+        "prioridad": "alta"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,16 @@
+info:
+  name: Peticion1-Listar mascotas (sin token)
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: http://localhost:8080/mascotas
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

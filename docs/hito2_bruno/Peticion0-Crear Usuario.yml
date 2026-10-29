@@ -1,0 +1,25 @@
+info:
+  name: Peticion0-Crear Usuario
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8080/usuarios
+  body:
+    type: json
+    data: |
+      {
+        "nombre": "Ana Cliente",
+        "correo": "ana@example.com",
+        "clave": "secreta",
+        "rol": "cliente"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

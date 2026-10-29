@@ -1,0 +1,118 @@
+openapi: 3.0.0
+info:
+  title: API Nutrición Mascotas
+  version: "1.0"
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Servidor local de pruebas
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+paths:
+  /mascotas:
+    get:
+      summary: Listar mascotas
+      operationId: listarMascotas
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de mascotas
+        "401":
+          description: No autorizado
+    post:
+      summary: Crear mascota
+      operationId: crearMascota
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Mascota creada
+        "401":
+          description: No autorizado
+
+  /planes/{id}:
+    get:
+      summary: Ver plan nutricional
+      operationId: verPlan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Plan nutricional
+        "401":
+          description: No autorizado
+    patch:
+      summary: Cambiar estado de plan nutricional
+      operationId: cambiarEstadoPlan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Estado actualizado
+        "403":
+          description: Rol no autorizado
+        "422":
+          description: Transición prohibida
+        "401":
+          description: No autorizado
+
+  /planes:
+    post:
+      summary: Crear plan nutricional
+      operationId: crearPlan
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Plan creado
+        "401":
+          description: No autorizado
+
+  /detalles:
+    post:
+      summary: Crear detalle nutricional
+      operationId: crearDetalle
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Detalle creado
+        "401":
+          description: No autorizado
+
+  /citas:
+    post:
+      summary: Crear cita veterinaria
+      operationId: crearCita
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Cita creada
+        "401":
+          description: No autorizado

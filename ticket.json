@@ -1,4 +1,5 @@
 {
-  "titulo": "Impresora sin toner",
+  "titulo": "Ticket de prueba",
+  "descripcion": "Este ticket se usa para demo",
   "prioridad": "alta"
 }

@@ -33,3 +33,17 @@
 
 ## Criterio del hito
 Ni una sola respuesta en texto plano. Todas las respuestas son JSON con el código correcto.
+
+## HITO 2
+
+
+## 4. Organización en capas de la entidad principal
+- **Qué se decidió**: Separar responsabilidades en archivos distintos:
+  - `manejadores.go`: define las rutas y recibe las peticiones HTTP.
+  - `estado.go`: contiene la lógica de negocio para validar transiciones de estado.
+  - `modelos.go`: define las entidades con GORM y JSON.
+  - `usuarios.go`, `tokens.go`, `guardia.go`: manejan login, emisión de tokens y middleware de seguridad.
+  - `respuesta.go`: unifica el formato de salida (Error, Exito).
+- **Por qué**: Evita mezclar responsabilidades, facilita pruebas unitarias y cumple con el principio de capas.
+- **Alternativa descartada**: Poner toda la lógica en un solo archivo.
+- **Cómo se verificó**: Se ejecutaron las pruebas (`go test ./...`) y se comprobó que las rutas responden en JSON con el código correcto.
