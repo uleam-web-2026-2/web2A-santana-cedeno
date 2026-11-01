@@ -47,3 +47,56 @@ Ni una sola respuesta en texto plano. Todas las respuestas son JSON con el códi
 - **Por qué**: Evita mezclar responsabilidades, facilita pruebas unitarias y cumple con el principio de capas.
 - **Alternativa descartada**: Poner toda la lógica en un solo archivo.
 - **Cómo se verificó**: Se ejecutaron las pruebas (`go test ./...`) y se comprobó que las rutas responden en JSON con el código correcto.
+
+
+# Decisiones de arquitectura – Hito 2
+
+## 1. Organización por capas
+
+Para el desarrollo del Hito 2 se organizó el módulo de nutrición en tres responsabilidades principales:
+
+- **Manejador HTTP:** recibe las solicitudes, valida los datos de entrada y devuelve las respuestas HTTP correspondientes.
+- **Servicio:** contiene las reglas de negocio, especialmente la validación de las transiciones de estado de los planes nutricionales.
+- **Repositorio:** se encarga de consultar y guardar los planes nutricionales. Se implementaron repositorios en memoria y mediante GORM.
+
+## 2. Separación de responsabilidades
+
+El manejador HTTP no realiza consultas directas a la base de datos. En su lugar, utiliza el servicio de planes, que trabaja mediante la interfaz `RepositorioPlanes`.
+
+La regla de negocio para cambiar el estado es independiente del protocolo HTTP. Esto permite reutilizarla y probarla sin depender de una solicitud web.
+
+## 3. Validación de transiciones
+
+Se establecieron las siguientes transiciones permitidas:
+
+| Estado actual | Estados permitidos |
+|---|---|
+| Pendiente | Activo, cancelado |
+| Activo | Finalizado, cancelado |
+| Finalizado | Ninguno |
+| Cancelado | Ninguno |
+
+Cuando se intenta realizar una transición no permitida, el sistema devuelve el código HTTP 422.
+
+## 4. Autenticación y autorización
+
+Se implementó autenticación mediante tokens JWT. Las rutas protegidas requieren un token válido.
+
+También se incorporó control de acceso basado en roles para restringir determinadas operaciones a usuarios autorizados.
+
+## 5. Pruebas realizadas
+
+Se ejecutó `go test ./...` para comprobar los paquetes del proyecto.
+
+Además, se verificaron las siguientes respuestas:
+
+- HTTP 401: solicitud a una ruta protegida sin autenticación válida.
+- HTTP 403: usuario sin el rol requerido.
+- HTTP 422: transición de estado no permitida.
+- HTTP 200: transición de estado permitida.
+
+Se agregó una prueba de integración para comprobar que una transición no permitida devuelve HTTP 422 utilizando autenticación JWT.
+
+## 6. Consideraciones
+
+Para la demostración actual se utiliza un repositorio en memoria porque el servidor se ejecuta con `DB: nil`. También se implementó un repositorio GORM para permitir el uso de una base de datos cuando exista una conexión configurada.

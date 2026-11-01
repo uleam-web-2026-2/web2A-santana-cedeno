@@ -66,20 +66,28 @@ func (m *Manejador) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 👉 Simulación: usuario fijo en memoria
-	if pedido.Usuario != "Ana Cliente" || pedido.Clave != "secreta" {
+	var u Usuario
+
+	switch {
+	case pedido.Usuario == "Ana Cliente" && pedido.Clave == "secreta":
+		u = Usuario{
+			ID:     1,
+			Nombre: "Ana Cliente",
+			Rol:    RolCliente,
+		}
+
+	case pedido.Usuario == "Luis Veterinario" && pedido.Clave == "veterinario123":
+		u = Usuario{
+			ID:     2,
+			Nombre: "Luis Veterinario",
+			Rol:    RolVeterinario,
+		}
+
+	default:
 		respuesta.Error(w, http.StatusUnauthorized, "credenciales_invalidas", "usuario o contraseña incorrectos")
 		return
 	}
 
-	// Crear usuario simulado
-	u := Usuario{
-		ID:     1,
-		Nombre: pedido.Usuario,
-		Rol:    "cliente",
-	}
-
-	// Emitir token JWT
 	token, err := m.Tokens.Emitir(u)
 	if err != nil {
 		respuesta.Error(w, http.StatusInternalServerError, "error_token", "no se pudo emitir el token")
