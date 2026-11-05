@@ -100,3 +100,83 @@ Se agregó una prueba de integración para comprobar que una transición no perm
 ## 6. Consideraciones
 
 Para la demostración actual se utiliza un repositorio en memoria porque el servidor se ejecuta con `DB: nil`. También se implementó un repositorio GORM para permitir el uso de una base de datos cuando exista una conexión configurada.
+
+
+---
+
+## Semana 10 · transacciones
+
+### D1 · El caso
+
+Actualmente nuestro proyecto de nutrición para mascotas no tiene un caso de uso implementado que necesite realizar dos escrituras en dos tablas o dos filas como una única operación.
+
+Por este motivo, siguiendo las indicaciones del taller, no se añadieron tablas ni operaciones artificiales solamente para implementar una transacción.
+
+El problema planteado en el taller con ConfirmarYCobrar sirve para mostrar qué ocurre cuando una operación necesita realizar dos escrituras relacionadas. Si la primera escritura se guarda correctamente y la segunda falla, el sistema queda en un estado inconsistente aunque el cliente reciba un error.
+
+En nuestro proyecto podría aparecer una situación equivalente si en el futuro se implementara una operación para crear un plan nutricional junto con su detalle nutricional. La operación tendría que guardar el PlanNutricional y el DetalleNutricional como una sola unidad de trabajo.
+
+Si se guardara el plan y después fallara la creación del detalle, quedaría un plan nutricional incompleto. Por tanto, ambas escrituras deberían completarse o deshacerse juntas.
+
+### D2 · Opciones que consideramos
+
+Consideramos dos alternativas.
+
+**Opción 1: controlar cada escritura por separado desde el servicio.**
+
+El servicio podría llamar primero al repositorio para guardar el plan y después realizar una segunda llamada para guardar su detalle.
+
+Esta alternativa mantiene una implementación sencilla, pero no garantiza atomicidad. Si la primera operación termina correctamente y la segunda falla, la primera modificación ya habría quedado almacenada.
+
+**Opción 2: delegar la transacción al adaptador del repositorio.**
+
+El servicio expresaría la operación de negocio mediante la interfaz del repositorio, sin conocer GORM, database/sql ni los detalles de la transacción.
+
+Cada adaptador sería responsable de ejecutar las escrituras dentro de una transacción de la tecnología que utiliza. De esta manera, si una de las operaciones falla, el adaptador podría deshacer el conjunto completo.
+
+Esta opción respeta la separación entre la lógica de negocio y la infraestructura.
+
+### D3 · La que elegimos y por qué
+
+Elegiríamos que la transacción sea responsabilidad del adaptador del repositorio.
+
+La razón en nuestro proyecto es que ServicioPlanes debe mantenerse independiente de la tecnología utilizada para persistir los datos. Actualmente ya trabajamos mediante la interfaz RepositorioPlanes y durante el taller incorporamos un adaptador que utiliza sqlc para determinadas operaciones.
+
+Por ello, el servicio no debería conocer cómo comienza, confirma o revierte una transacción.
+
+Si en el futuro la creación de un plan nutricional y sus detalles tuviera que ser atómica, la interfaz representaría esa operación de negocio y cada adaptador resolvería internamente su propia transacción.
+
+### D4 · La que descartamos y por qué
+
+Descartamos gestionar las dos escrituras de manera independiente desde el servicio.
+
+En nuestro caso, el problema sería que podría guardarse un PlanNutricional y fallar posteriormente la creación de su DetalleNutricional. El sistema devolvería un error al cliente, pero el plan ya habría quedado almacenado y la operación estaría completada solo parcialmente.
+
+También descartamos que el servicio gestione directamente una transacción de GORM o database/sql, porque eso haría que la lógica de negocio dependiera de una tecnología concreta de persistencia.
+
+### D5 · Con sqlc
+
+En la Fase 3 incorporamos sqlc mediante un adaptador que implementa la misma interfaz utilizada por ServicioPlanes.
+
+Para un futuro caso transaccional, mantendríamos el mismo principio: el servicio no tendría que modificarse para conocer sqlc. La transacción sería resuelta dentro del adaptador correspondiente.
+
+En el taller actual no añadimos consultas ni transacciones nuevas para este punto porque nuestro proyecto todavía no posee un caso de uso implementado que realice las dos escrituras relacionadas. Implementarlas solamente para esta fase supondría inventar una operación que actualmente no existe en el proyecto.
+
+### D6 · Archivos
+
+Para esta fase se modificó:
+
+- `docs/decisiones.md`
+
+No fue necesario modificar:
+
+- `internal/nutricion/modelos.go`
+- `internal/nutricion/servicio.go`
+- `internal/nutricion/repositorio.go`
+- `internal/nutricion/repositorio_sqlc.go`
+- `internal/nutricion/manejadores.go`
+- `db/schema.sql`
+- `db/consultas.sql`
+- `main.go`
+
+La razón es que esta fase se resolvió como una decisión de diseño, ya que el proyecto no dispone actualmente de un caso de uso que necesite dos escrituras atómicas.
