@@ -1,4 +1,5 @@
 openapi: 3.0.0
+
 info:
   title: API Nutrición Mascotas
   version: "1.0"
@@ -17,8 +18,105 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
-security:
-  - bearerAuth: []
+  schemas:
+    Mascota:
+      type: object
+      properties:
+        id:
+          type: integer
+        id_usuario:
+          type: integer
+        nombre:
+          type: string
+        especie:
+          type: string
+        raza:
+          type: string
+        peso:
+          type: string
+        estado_salud:
+          type: string
+
+    PlanNutricionalPeticion:
+      type: object
+      required:
+        - id_mascota
+        - descripcion
+        - fecha_inicio
+        - fecha_fin
+      properties:
+        id_mascota:
+          type: integer
+        descripcion:
+          type: string
+        fecha_inicio:
+          type: string
+        fecha_fin:
+          type: string
+
+    PlanNutricional:
+      type: object
+      properties:
+        id:
+          type: integer
+        id_mascota:
+          type: integer
+        estado:
+          type: string
+          enum:
+            - pendiente
+            - activo
+            - finalizado
+            - cancelado
+        descripcion:
+          type: string
+        fecha_inicio:
+          type: string
+        fecha_fin:
+          type: string
+
+    CambioEstado:
+      type: object
+      required:
+        - estado
+      properties:
+        estado:
+          type: string
+          enum:
+            - pendiente
+            - activo
+            - finalizado
+            - cancelado
+
+    DetalleNutricional:
+      type: object
+      properties:
+        id:
+          type: integer
+        id_plan_nutricional:
+          type: integer
+        tipo_alimento:
+          type: string
+        cantidad:
+          type: string
+        frecuencia:
+          type: string
+        suplementos:
+          type: string
+
+    Cita:
+      type: object
+      properties:
+        id:
+          type: integer
+        id_usuario:
+          type: integer
+        id_mascota:
+          type: integer
+        fecha:
+          type: string
+        motivo:
+          type: string
 
 paths:
   /mascotas:
@@ -30,8 +128,15 @@ paths:
       responses:
         "200":
           description: Lista de mascotas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Mascota"
         "401":
           description: No autorizado
+
     post:
       summary: Crear mascota
       operationId: crearMascota
@@ -40,6 +145,34 @@ paths:
       responses:
         "201":
           description: Mascota creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mascota"
+        "401":
+          description: No autorizado
+
+  /planes:
+    post:
+      summary: Crear plan nutricional
+      operationId: crearPlan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanNutricionalPeticion"
+      responses:
+        "201":
+          description: Plan creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanNutricional"
+        "400":
+          description: Cuerpo JSON no válido
         "401":
           description: No autorizado
 
@@ -58,8 +191,15 @@ paths:
       responses:
         "200":
           description: Plan nutricional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanNutricional"
         "401":
           description: No autorizado
+        "404":
+          description: Plan no encontrado
+
     patch:
       summary: Cambiar estado de plan nutricional
       operationId: cambiarEstadoPlan
@@ -71,27 +211,27 @@ paths:
             type: integer
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambioEstado"
       responses:
         "200":
           description: Estado actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanNutricional"
+        "401":
+          description: No autorizado
         "403":
           description: Rol no autorizado
+        "404":
+          description: Plan no encontrado
         "422":
-          description: Transición prohibida
-        "401":
-          description: No autorizado
-
-  /planes:
-    post:
-      summary: Crear plan nutricional
-      operationId: crearPlan
-      security:
-        - bearerAuth: []
-      responses:
-        "201":
-          description: Plan creado
-        "401":
-          description: No autorizado
+          description: Estado o transición no permitida
 
   /detalles:
     post:
@@ -102,6 +242,10 @@ paths:
       responses:
         "201":
           description: Detalle creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetalleNutricional"
         "401":
           description: No autorizado
 
@@ -114,5 +258,9 @@ paths:
       responses:
         "201":
           description: Cita creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cita"
         "401":
           description: No autorizado

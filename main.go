@@ -52,11 +52,11 @@ func main() {
 	r.Put("/tickets/{id}/estado", servicioTickets.ActualizarEstado)
 
 	// ---------------------------------------------------------
-	// Autenticación
+	// Variables de entorno y autenticación
 	// ---------------------------------------------------------
 	secreto := os.Getenv("TOKEN_SECRETO")
 	if secreto == "" {
-		secreto = "mi-clave-super-secreta"
+		log.Fatal("falta la variable de entorno TOKEN_SECRETO")
 	}
 
 	tokens := sesion.NuevosTokens(secreto)
@@ -86,7 +86,9 @@ func main() {
 		log.Fatal("no se pudo migrar PlanNutricional: ", err)
 	}
 
-	// Semilla inicial para conservar los planes usados en las pruebas.
+	// ---------------------------------------------------------
+	// Datos iniciales de prueba
+	// ---------------------------------------------------------
 	var cantidadPlanes int64
 
 	if err := db.Model(&nutricion.PlanNutricional{}).
@@ -138,7 +140,9 @@ func main() {
 
 	manejadorNutricion.Rutas(r, tokens)
 
-	// Ruta exclusiva para veterinarios.
+	// ---------------------------------------------------------
+	// Ruta exclusiva para veterinarios
+	// ---------------------------------------------------------
 	r.With(
 		sesion.Guardia(tokens),
 		sesion.RequiereRol(sesion.RolVeterinario),
