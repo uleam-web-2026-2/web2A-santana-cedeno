@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-chi/chi/v5"
+
 	"mesa-ayuda/internal/middleware"
 	"mesa-ayuda/internal/nutricion"
 	"mesa-ayuda/internal/respuesta"
 	"mesa-ayuda/internal/sesion"
 	"mesa-ayuda/internal/tickets"
-
-	"github.com/go-chi/chi/v5"
 )
 
 func main() {
@@ -28,12 +28,16 @@ func main() {
 		respuesta.Error(w, http.StatusMethodNotAllowed, "metodo_no_permitido", "el método no está permitido en esta ruta")
 	})
 
-	// Tickets
-	almacen := tickets.NuevoAlmacen()
-	r.Get("/tickets", almacen.Listar)
-	r.Post("/tickets", almacen.Crear)
-	r.Get("/tickets/{id}", almacen.Obtener)
-	r.Put("/tickets/{id}/estado", almacen.ActualizarEstado)
+	// ---------------------------------------------------------
+	// Tickets: Inyección de dependencias (Repositorio -> Servicio)
+	// ---------------------------------------------------------
+	repo := tickets.NuevoRepositorioMemoria()
+	servicioTickets := tickets.NuevoServicio(repo)
+
+	r.Get("/tickets", servicioTickets.Listar)
+	r.Post("/tickets", servicioTickets.Crear)
+	r.Get("/tickets/{id}", servicioTickets.Obtener)
+	r.Put("/tickets/{id}/estado", servicioTickets.ActualizarEstado)
 
 	// Autenticación
 	secreto := os.Getenv("TOKEN_SECRETO")

@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,58 +14,88 @@ import (
 )
 
 type Ticket struct {
-	ID        int    `json:"id"`
+	ID        uint   `json:"id"`
 	Titulo    string `json:"titulo"`
-	Prioridad string `json:"prioridad"` // baja | media | alta
-	Estado    string `json:"estado"`    // abierto al crear
+	Prioridad string `json:"prioridad"`
+	Estado    string `json:"estado"`
 }
 
-type Almacen struct {
+// RepositorioMemoria implementa la interfaz Repositorio
+type RepositorioMemoria struct {
 	mu     sync.Mutex
-	ultimo int
-	items  map[int]Ticket
+	items  map[uint]Ticket
+	ultimo uint
 }
 
-func NuevoAlmacen() *Almacen {
-	return &Almacen{items: map[int]Ticket{}}
+func NuevoRepositorioMemoria() *RepositorioMemoria {
+	return &RepositorioMemoria{
+		items: make(map[uint]Ticket),
+	}
 }
 
-func (a *Almacen) crear(titulo, prioridad string) Ticket {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.ultimo++
-	t := Ticket{ID: a.ultimo, Titulo: titulo, Prioridad: prioridad, Estado: "abierto"}
-	a.items[t.ID] = t
-	return t
-}
-
-func (a *Almacen) obtener(id int) (Ticket, bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	t, ok := a.items[id]
-	return t, ok
-}
-
-func (a *Almacen) listar() []Ticket {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	lista := make([]Ticket, 0, len(a.items))
-	for i := 1; i <= a.ultimo; i++ {
-		if t, ok := a.items[i]; ok {
+func (r *RepositorioMemoria) Listar(estado string) ([]Ticket, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var lista []Ticket
+	for _, t := range r.items {
+		if estado == "" || t.Estado == estado {
 			lista = append(lista, t)
 		}
 	}
-	return lista
+	return lista, nil
 }
 
-type entradaCrear struct {
-	Titulo    string `json:"titulo"`
-	Prioridad string `json:"prioridad"`
+func (r *RepositorioMemoria) Buscar(id uint) (Ticket, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.items[id]
+	if !ok {
+		return Ticket{}, errors.New("no encontrado")
+	}
+	return t, nil
+}
+
+func (r *RepositorioMemoria) Crear(t *Ticket) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ultimo++
+	t.ID = r.ultimo
+	t.Estado = "abierto"
+	r.items[t.ID] = *t
+	return nil
+}
+
+func (r *RepositorioMemoria) Guardar(t *Ticket) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.items[t.ID]; !ok {
+		return errors.New("no encontrado")
+	}
+	r.items[t.ID] = *t
+	return nil
+}
+
+func (r *RepositorioMemoria) Borrar(id uint) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.items[id]; !ok {
+		return errors.New("no encontrado")
+	}
+	delete(r.items, id)
+	return nil
+}
+
+// Servicio de tickets
+type Servicio struct {
+	repo Repositorio
+}
+
+func NuevoServicio(r Repositorio) *Servicio {
+	return &Servicio{repo: r}
 }
 
 var prioridadesValidas = map[string]bool{"baja": true, "media": true, "alta": true}
 
-// Máquina de estados
 var siguientes = map[string][]string{
 	"abierto":    {"en_proceso"},
 	"en_proceso": {"cerrado"},
@@ -80,51 +111,63 @@ func puedePasar(de, a string) bool {
 	return false
 }
 
-// Handlers
-func (a *Almacen) Listar(w http.ResponseWriter, r *http.Request) {
-	respuesta.Exito(w, http.StatusOK, a.listar())
+func (s *Servicio) Listar(w http.ResponseWriter, r *http.Request) {
+	estado := r.URL.Query().Get("estado")
+	tickets, err := s.repo.Listar(estado)
+	if err != nil {
+		respuesta.Error(w, http.StatusInternalServerError, "error_interno", err.Error())
+		return
+	}
+	respuesta.Exito(w, http.StatusOK, tickets)
 }
 
-func (a *Almacen) Obtener(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(chi.URLParam(r, "id"))
-	if err != nil || id <= 0 {
+func (s *Servicio) Obtener(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)
+	if err != nil || id == 0 {
 		respuesta.Error(w, http.StatusBadRequest, "id_invalido", "el id debe ser un entero positivo")
 		return
 	}
-	t, ok := a.obtener(id)
-	if !ok {
+	t, err := s.repo.Buscar(uint(id))
+	if err != nil {
 		respuesta.Error(w, http.StatusNotFound, "no_encontrado", "no existe un ticket con ese id")
 		return
 	}
 	respuesta.Exito(w, http.StatusOK, t)
 }
 
-func (a *Almacen) Crear(w http.ResponseWriter, r *http.Request) {
-	var entrada entradaCrear
+func (s *Servicio) Crear(w http.ResponseWriter, r *http.Request) {
+	var entrada struct {
+		Titulo    string `json:"titulo"`
+		Prioridad string `json:"prioridad"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&entrada); err != nil {
-		respuesta.Error(w, http.StatusBadRequest, "cuerpo_malformado",
-			"el cuerpo debe ser JSON con los campos titulo y prioridad")
+		respuesta.Error(w, http.StatusBadRequest, "cuerpo_malformado", "el cuerpo debe ser JSON con los campos titulo y prioridad")
 		return
 	}
 	titulo := strings.TrimSpace(entrada.Titulo)
 	if len(titulo) < 5 {
-		respuesta.Error(w, http.StatusUnprocessableEntity, "datos_invalidos",
-			"el título debe tener al menos 5 caracteres")
+		respuesta.Error(w, http.StatusUnprocessableEntity, "datos_invalidos", "el título debe tener al menos 5 caracteres")
 		return
 	}
 	if !prioridadesValidas[entrada.Prioridad] {
-		respuesta.Error(w, http.StatusUnprocessableEntity, "datos_invalidos",
-			"la prioridad debe ser baja, media o alta")
+		respuesta.Error(w, http.StatusUnprocessableEntity, "datos_invalidos", "la prioridad debe ser baja, media o alta")
 		return
 	}
-	t := a.crear(titulo, entrada.Prioridad)
-	respuesta.Exito(w, http.StatusCreated, t)
+
+	nuevoTicket := &Ticket{
+		Titulo:    titulo,
+		Prioridad: entrada.Prioridad,
+	}
+	if err := s.repo.Crear(nuevoTicket); err != nil {
+		respuesta.Error(w, http.StatusInternalServerError, "error_interno", err.Error())
+		return
+	}
+	respuesta.Exito(w, http.StatusCreated, nuevoTicket)
 }
 
-// Nuevo handler: actualizar estado
-func (a *Almacen) ActualizarEstado(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(chi.URLParam(r, "id"))
-	if err != nil || id <= 0 {
+func (s *Servicio) ActualizarEstado(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)
+	if err != nil || id == 0 {
 		respuesta.Error(w, http.StatusBadRequest, "id_invalido", "el id debe ser un entero positivo")
 		return
 	}
@@ -137,10 +180,8 @@ func (a *Almacen) ActualizarEstado(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	t, ok := a.items[id]
-	if !ok {
+	t, err := s.repo.Buscar(uint(id))
+	if err != nil {
 		respuesta.Error(w, http.StatusNotFound, "no_encontrado", "no existe un ticket con ese id")
 		return
 	}
@@ -151,18 +192,15 @@ func (a *Almacen) ActualizarEstado(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !puedePasar(t.Estado, body.Estado) {
-		respuesta.Error(w, http.StatusUnprocessableEntity, "transicion_invalida",
-			"no se puede pasar de "+t.Estado+" a "+body.Estado)
+		respuesta.Error(w, http.StatusUnprocessableEntity, "transicion_invalida", "no se puede pasar de "+t.Estado+" a "+body.Estado)
 		return
 	}
 
 	t.Estado = body.Estado
-	a.items[id] = t
-	respuesta.Exito(w, http.StatusOK, t)
-}
+	if err := s.repo.Guardar(&t); err != nil {
+		respuesta.Error(w, http.StatusInternalServerError, "error_interno", err.Error())
+		return
+	}
 
-// Ruta de prueba para provocar pánico
-func Explotar(w http.ResponseWriter, r *http.Request) {
-	var t *Ticket
-	_ = t.Titulo // provoca pánico
+	respuesta.Exito(w, http.StatusOK, t)
 }

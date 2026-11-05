@@ -41,7 +41,7 @@ func (m *Manejador) Rutas(r chi.Router, tokens *sesion.Tokens) {
 		r.Get("/planes/{id}", m.verPlan)
 		r.Post("/planes", m.crearPlan)
 		r.With(sesion.RequiereRol(sesion.RolVeterinario)).
-  		  Patch("/planes/{id}", m.cambiarEstado)
+			Patch("/planes/{id}", m.cambiarEstado)
 
 		r.Post("/detalles", m.crearDetalle)
 		r.Post("/citas", m.crearCita)
