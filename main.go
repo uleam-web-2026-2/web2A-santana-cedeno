@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"mesa-ayuda/internal/middleware"
 	"mesa-ayuda/internal/nutricion"
@@ -21,25 +23,37 @@ func main() {
 	r.Use(middleware.Recuperacion)
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		respuesta.Error(w, http.StatusNotFound, "ruta_inexistente", "la ruta no existe")
+		respuesta.Error(
+			w,
+			http.StatusNotFound,
+			"ruta_inexistente",
+			"la ruta no existe",
+		)
 	})
 
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		respuesta.Error(w, http.StatusMethodNotAllowed, "metodo_no_permitido", "el método no está permitido en esta ruta")
+		respuesta.Error(
+			w,
+			http.StatusMethodNotAllowed,
+			"metodo_no_permitido",
+			"el método no está permitido en esta ruta",
+		)
 	})
 
 	// ---------------------------------------------------------
-	// Tickets: Inyección de dependencias (Repositorio -> Servicio)
+	// Tickets: repositorio en memoria
 	// ---------------------------------------------------------
-	repo := tickets.NuevoRepositorioMemoria()
-	servicioTickets := tickets.NuevoServicio(repo)
+	repoTickets := tickets.NuevoRepositorioMemoria()
+	servicioTickets := tickets.NuevoServicio(repoTickets)
 
 	r.Get("/tickets", servicioTickets.Listar)
 	r.Post("/tickets", servicioTickets.Crear)
 	r.Get("/tickets/{id}", servicioTickets.Obtener)
 	r.Put("/tickets/{id}/estado", servicioTickets.ActualizarEstado)
 
+	// ---------------------------------------------------------
 	// Autenticación
+	// ---------------------------------------------------------
 	secreto := os.Getenv("TOKEN_SECRETO")
 	if secreto == "" {
 		secreto = "mi-clave-super-secreta"
@@ -54,29 +68,77 @@ func main() {
 
 	r.Post("/login", manejadorSesion.Login)
 
-	// Rutas protegidas de nutrición
-	manejadorNutricion := &nutricion.Manejador{
-		DB:     nil,
-		Tokens: tokens,
-		Planes: map[uint]nutricion.PlanNutricional{
-			1: {
-				ID:          1,
+	// ---------------------------------------------------------
+	// Conexión a PostgreSQL
+	// ---------------------------------------------------------
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("falta la variable de entorno DATABASE_URL")
+	}
+
+	db, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
+	if err != nil {
+		log.Fatal("no se pudo conectar con PostgreSQL: ", err)
+	}
+
+	// GORM continúa creando y actualizando la tabla.
+	if err := db.AutoMigrate(&nutricion.PlanNutricional{}); err != nil {
+		log.Fatal("no se pudo migrar PlanNutricional: ", err)
+	}
+
+	// Semilla inicial para conservar los planes usados en las pruebas.
+	var cantidadPlanes int64
+
+	if err := db.Model(&nutricion.PlanNutricional{}).
+		Count(&cantidadPlanes).Error; err != nil {
+		log.Fatal("no se pudieron contar los planes: ", err)
+	}
+
+	if cantidadPlanes == 0 {
+		planesIniciales := []nutricion.PlanNutricional{
+			{
 				IdMascota:   1,
 				Estado:      "finalizado",
 				Descripcion: "Plan de prueba finalizado",
 			},
-			2: {
-				ID:          2,
+			{
 				IdMascota:   1,
 				Estado:      "pendiente",
 				Descripcion: "Plan de prueba pendiente",
 			},
-		},
+		}
+
+		if err := db.Create(&planesIniciales).Error; err != nil {
+			log.Fatal("no se pudieron crear los planes iniciales: ", err)
+		}
+	}
+
+	// ---------------------------------------------------------
+	// Repositorio híbrido: GORM + sqlc
+	// ---------------------------------------------------------
+	conexion, err := db.DB()
+	if err != nil {
+		log.Fatal("no se pudo obtener la conexión SQL: ", err)
+	}
+
+	repoGORM := nutricion.NuevoRepositorioGORM(db)
+
+	repoSqlc := nutricion.NuevoRepositorioPlanesSqlc(
+		repoGORM,
+		conexion,
+	)
+
+	servicioPlanes := nutricion.NuevoServicioPlanes(repoSqlc)
+
+	manejadorNutricion := &nutricion.Manejador{
+		DB:       db,
+		Tokens:   tokens,
+		Servicio: servicioPlanes,
 	}
 
 	manejadorNutricion.Rutas(r, tokens)
 
-	// Ruta exclusiva para veterinarios
+	// Ruta exclusiva para veterinarios.
 	r.With(
 		sesion.Guardia(tokens),
 		sesion.RequiereRol(sesion.RolVeterinario),
