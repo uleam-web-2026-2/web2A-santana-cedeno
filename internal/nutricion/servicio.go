@@ -24,6 +24,18 @@ func NuevoServicioPlanes(repo RepositorioPlanes) *ServicioPlanes {
 	return &ServicioPlanes{Repositorio: repo}
 }
 
+// Crear crea un nuevo plan nutricional.
+// El estado inicial siempre lo decide el servidor.
+func (s *ServicioPlanes) Crear(plan PlanNutricional) (PlanNutricional, error) {
+	plan.Estado = "pendiente"
+
+	if err := s.Repositorio.Crear(&plan); err != nil {
+		return PlanNutricional{}, err
+	}
+
+	return plan, nil
+}
+
 func (s *ServicioPlanes) CambiarEstado(id uint, nuevoEstado string) (PlanNutricional, error) {
 	if _, existe := siguientes[nuevoEstado]; !existe {
 		return PlanNutricional{}, ErrEstadoInvalido

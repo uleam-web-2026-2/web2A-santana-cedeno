@@ -18,12 +18,12 @@ type Mascota struct {
 }
 
 type PlanNutricional struct {
-	ID          uint   `json:"id" gorm:"primaryKey"`
-	IdMascota   uint   `json:"id_mascota"`
-	Estado      string `json:"estado"`
-	Descripcion string `json:"descripcion"`
-	FechaInicio string `json:"fecha_inicio"`
-	FechaFin    string `json:"fecha_fin"`
+	ID          uint `gorm:"primaryKey"`
+	IdMascota   uint
+	Estado      string
+	Descripcion string
+	FechaInicio string
+	FechaFin    string
 }
 
 type DetalleNutricional struct {

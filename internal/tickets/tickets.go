@@ -14,10 +14,10 @@ import (
 )
 
 type Ticket struct {
-	ID        uint   `json:"id"`
-	Titulo    string `json:"titulo"`
-	Prioridad string `json:"prioridad"`
-	Estado    string `json:"estado"`
+	ID        uint
+	Titulo    string
+	Prioridad string
+	Estado    string
 }
 
 // RepositorioMemoria implementa la interfaz Repositorio

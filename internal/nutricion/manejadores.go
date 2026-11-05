@@ -1,8 +1,10 @@
 package nutricion
 
 import (
+	"encoding/json"
 	"net/http"
 
+	"mesa-ayuda/internal/respuesta"
 	"mesa-ayuda/internal/sesion"
 
 	"github.com/go-chi/chi/v5"
@@ -61,7 +63,34 @@ func (m *Manejador) verPlan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Manejador) crearPlan(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("crearPlan OK"))
+	var pedido PlanNutricionalPeticion
+
+	if err := json.NewDecoder(r.Body).Decode(&pedido); err != nil {
+		respuesta.Error(
+			w,
+			http.StatusBadRequest,
+			"json_invalido",
+			"el cuerpo no es JSON válido",
+		)
+		return
+	}
+
+	creado, err := m.Servicio.Crear(pedido.aEntidad())
+	if err != nil {
+		respuesta.Error(
+			w,
+			http.StatusInternalServerError,
+			"error_crear_plan",
+			"no se pudo crear el plan nutricional",
+		)
+		return
+	}
+
+	respuesta.Exito(
+		w,
+		http.StatusCreated,
+		nuevaRespuesta(creado),
+	)
 }
 
 func (m *Manejador) crearDetalle(w http.ResponseWriter, r *http.Request) {
