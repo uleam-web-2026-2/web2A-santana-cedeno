@@ -180,3 +180,78 @@ No fue necesario modificar:
 - `main.go`
 
 La razón es que esta fase se resolvió como una decisión de diseño, ya que el proyecto no dispone actualmente de un caso de uso que necesite dos escrituras atómicas.
+
+---
+
+## Semana 11 · Docker
+
+### D1 · Imagen de dos etapas
+
+Para contenerizar la API se utilizó un Dockerfile de dos etapas.
+
+La primera etapa utiliza `golang:1.27` y contiene las herramientas necesarias para descargar las dependencias y compilar el proyecto. En esta etapa se ejecuta la compilación con `CGO_ENABLED=0` para obtener el binario `/servidor`.
+
+La segunda etapa utiliza `gcr.io/distroless/static-debian13:nonroot` y recibe únicamente el binario generado en la etapa anterior. De esta forma, la imagen final no necesita incluir todo el entorno de compilación de Go.
+
+La diferencia se comprobó en `docs/taller11/imagenes.txt`: nuestra imagen `nutricion:compilacion` ocupa aproximadamente 1.62 GB, mientras que la imagen final `nutricion:latest` ocupa aproximadamente 38.7 MB.
+
+También se comprobó en `docs/taller11/capas.txt` que el binario `/servidor` ocupa aproximadamente 21.3 MB dentro de la imagen.
+
+El archivo `.dockerignore` impide que archivos sensibles como `.env` y la carpeta `.git` entren en el contexto de construcción. Esto se comprobó mediante `docs/taller11/contexto.txt`.
+
+Finalmente, `docs/taller11/usuario.txt` devuelve `65532`, comprobando que la imagen final ejecuta el proceso con el usuario sin privilegios `nonroot`.
+
+### D2 · Variables y secretos
+
+La configuración que cambia entre máquinas no se incluyó dentro de la imagen Docker. Nuestra API necesita principalmente `DATABASE_URL` para conectarse a PostgreSQL y `TOKEN_SECRETO` para trabajar con los tokens.
+
+Se comprobó este comportamiento ejecutando la imagen sin proporcionar variables de entorno. El contenedor se detuvo indicando que faltaba `TOKEN_SECRETO`, y el resultado quedó guardado en `docs/taller11/1_sin_variables.txt`.
+
+Para ejecutar el contenedor utilizamos un archivo local `.env.docker`. Este archivo contiene los valores necesarios para nuestra máquina, pero no se sube al repositorio porque `.gitignore` excluye `.env.*`.
+
+El archivo `.env.example` sí permanece en el repositorio porque únicamente muestra la estructura de configuración y utiliza valores de ejemplo, sin contener secretos reales.
+
+De esta manera, la misma imagen Docker puede recibir la configuración necesaria al momento de arrancar sin guardar contraseñas ni secretos directamente dentro de la imagen.
+
+### D3 · Conexión desde el contenedor
+
+Al ejecutar inicialmente el contenedor con `DATABASE_URL` configurada con `host=localhost`, la conexión con PostgreSQL falló.
+
+La evidencia quedó guardada en `docs/taller11/2_local.txt`, donde se muestra que el contenedor intentó conectarse a `127.0.0.1:5432` y recibió `connection refused`.
+
+El problema ocurre porque el contenedor tiene su propio entorno de red. Por tanto, `localhost` dentro del contenedor no representa la máquina Windows donde se está ejecutando PostgreSQL.
+
+Para resolverlo en Docker Desktop cambiamos únicamente el host de la conexión en `.env.docker`:
+
+`host=localhost`
+
+por:
+
+`host=host.docker.internal`
+
+Se mantuvieron los demás datos de conexión de nuestro proyecto, incluida la base `nutricion_mascotas` y el puerto `5432`.
+
+Después del cambio, el contenedor pudo conectarse correctamente a PostgreSQL y la API quedó ejecutándose y accesible mediante el puerto `8080`.
+
+### D4 · Comportamiento de la API dentro del contenedor
+
+Después de proporcionar las variables de entorno correctas, configurar `host.docker.internal` para acceder a PostgreSQL y publicar el puerto `8080`, la API pudo ejecutarse completamente dentro del contenedor Docker.
+
+Se repitieron las mismas seis peticiones utilizadas como línea base con `go run` y se obtuvieron los mismos códigos HTTP:
+
+| Petición | Con go run | En el contenedor |
+| --- | --- | --- |
+| Sin token | 401 | 401 |
+| Login | 200 | 200 |
+| Con token | 200 | 200 |
+| Rol sin permiso | 403 | 403 |
+| Cambio permitido | 200 | 200 |
+| Transición prohibida | 422 | 422 |
+
+También se comparó la respuesta completa de la petición 3. Tanto con `go run` como desde el contenedor se obtuvo:
+
+`listarMascotas OK`
+
+Los resultados quedaron registrados en `docs/taller11/peticiones.md` y el funcionamiento del contenedor también quedó reflejado en `docs/taller11/contenedor_log.txt`.
+
+Por tanto, contenerizar la API no cambió el comportamiento observable de las seis peticiones utilizadas como referencia.

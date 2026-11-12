@@ -1,7 +1,10 @@
 *.exe
 *.out
 bin/
+
 .env
 .env.*
+!.env.example
+
 .DS_Store
 *.log
