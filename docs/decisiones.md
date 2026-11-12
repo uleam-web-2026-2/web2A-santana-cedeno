@@ -255,3 +255,98 @@ También se comparó la respuesta completa de la petición 3. Tanto con `go run`
 Los resultados quedaron registrados en `docs/taller11/peticiones.md` y el funcionamiento del contenedor también quedó reflejado en `docs/taller11/contenedor_log.txt`.
 
 Por tanto, contenerizar la API no cambió el comportamiento observable de las seis peticiones utilizadas como referencia.
+
+### D5 · API y PostgreSQL con Docker Compose
+
+Para el reto se creó `compose.yaml` con dos servicios: `api` y `db`.
+
+El servicio `api` construye la imagen utilizando el `Dockerfile` del proyecto y publica el puerto `8080` para que la API siga siendo accesible desde `http://127.0.0.1:8080`.
+
+El servicio `db` utiliza PostgreSQL y crea la base `nutricion_mascotas`.
+
+Con Docker Compose ya no fue necesario utilizar `host.docker.internal`. La variable `DATABASE_URL` de la API utiliza `host=db`, porque `db` es el nombre del servicio de PostgreSQL dentro de la configuración de Compose.
+
+De esta forma, un solo comando permite iniciar la API y la base de datos como servicios de la misma aplicación.
+
+### D6 · Comunicación entre servicios
+
+Con Docker Compose, la API y PostgreSQL forman parte de la misma aplicación y pueden comunicarse utilizando el nombre del servicio definido en `compose.yaml`.
+
+Por esta razón, la conexión de la API utiliza:
+
+`host=db`
+
+en lugar de:
+
+`host=localhost`
+
+o:
+
+`host=host.docker.internal`
+
+El nombre `db` corresponde al servicio PostgreSQL definido en `compose.yaml`.
+
+Esta configuración permite que la API se conecte directamente al servicio de base de datos administrado por Docker Compose, sin depender del PostgreSQL instalado directamente en Windows.
+
+Se comprobó el funcionamiento ejecutando `docker compose up -d`. PostgreSQL quedó en estado `healthy` y la API arrancó correctamente. Los registros de ambos servicios quedaron guardados en `docs/taller11/compose_log.txt`.
+
+### D7 · Persistencia de PostgreSQL
+
+En `compose.yaml` se definió el volumen llamado `nutricion_datos` para almacenar los datos de PostgreSQL.
+
+El servicio `db` monta este volumen en:
+
+`/var/lib/postgresql/data`
+
+La finalidad es separar los datos de la base de datos del ciclo de vida del contenedor. De esta manera, los datos no dependen únicamente del sistema de archivos interno del contenedor de PostgreSQL.
+
+Docker administra los volúmenes como almacenamiento persistente y Docker Compose puede reutilizar un volumen existente al volver a crear los servicios.
+
+Para nuestro proyecto, esto permite conservar la información de `nutricion_mascotas` aunque se recree el contenedor de PostgreSQL.
+
+### D8 · Orden de arranque y estado saludable
+
+PostgreSQL necesita estar preparado para aceptar conexiones antes de que la API intente utilizar la base de datos.
+
+Por este motivo, en `compose.yaml` se añadió un `healthcheck` al servicio `db` utilizando `pg_isready`.
+
+El servicio `api` utiliza:
+
+`depends_on`
+
+con la condición:
+
+`service_healthy`
+
+De esta manera, Docker Compose espera a que PostgreSQL alcance el estado saludable antes de iniciar la API.
+
+Durante la prueba se comprobó que el servicio `db` apareció como `healthy` y posteriormente el servicio `api` quedó iniciado correctamente.
+
+Los registros almacenados en `docs/taller11/compose_log.txt` también muestran que PostgreSQL quedó preparado para aceptar conexiones y que la API pudo atender las peticiones posteriormente.
+
+### D9 · Comprobación final con Docker Compose
+
+La solución del reto se comprobó levantando toda la aplicación mediante:
+
+`docker compose up -d`
+
+Con este comando se iniciaron los dos servicios definidos en `compose.yaml`: la API y PostgreSQL.
+
+La API siguió disponible en `http://127.0.0.1:8080` y se repitieron las seis peticiones utilizadas durante el taller.
+
+Los resultados obtenidos con Docker Compose fueron:
+
+| Petición | Con Compose |
+| --- | --- |
+| Sin token | 401 |
+| Login | 200 |
+| Con token | 200 |
+| Rol sin permiso | 403 |
+| Cambio permitido | 200 |
+| Transición prohibida | 422 |
+
+Estos códigos coinciden con los obtenidos anteriormente mediante `go run` y mediante el contenedor individual.
+
+Los resultados quedaron registrados en `docs/taller11/peticiones.md` y los registros de la API y PostgreSQL quedaron guardados en `docs/taller11/compose_log.txt`.
+
+Por tanto, el comportamiento observable de la API se mantuvo al ejecutar la API y PostgreSQL juntos mediante Docker Compose.
