@@ -1,0 +1,24 @@
+info:
+  name: Ana intenta modificar un plan
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: http://127.0.0.1:8080/planes/2
+  body:
+    type: json
+    data: |-
+      {
+        "estado": "activo"
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub21icmUiOiJBbmEgQ2xpZW50ZSIsInJvbCI6ImNsaWVudGUiLCJzdWIiOiIxIiwiZXhwIjoxNzk0NDU0MjAwLCJpYXQiOjE3OTQ0NTA2MDB9.ZfC3QqE3Wm-8CwYuOzhlRJkZiexOrWpD03n-WqCoEbA
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
