@@ -7,4 +7,4 @@
 | 3 con token | 200 | | |
 | 4 rol sin permiso | 403 | | |
 | 5 cambio permitido | 200 | | |
-| 6 transición prohibida | 400/409 | | |
+| 6 transición prohibida | 422 | | |

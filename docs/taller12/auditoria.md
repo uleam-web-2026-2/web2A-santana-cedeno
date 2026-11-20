@@ -11,3 +11,21 @@ Búsqueda ejecutada: `git grep -n -E -f docs/taller12/patrones.txt -- "*.go" ":(
 | `internal/almacen/almacen.go:74`, `internal/nutricion/manejadores.go:37`, `internal/tickets/tickets.go:115`, `internal/tickets/tickets.go:195` | No (ruta `.tmp`, grupo de rutas chi, lectura de query `estado` y mensaje de error HTTP en `respuesta.Error`) | Parcial (`estado`, `t.Estado`, `body.Estado` en respuesta/filtro) | No aplica SQL (`tickets.go:195` concatena con `+` el texto del error HTTP `transicion_invalida`, no una consulta SQL) | Revisada: se verificó que ninguna de estas líneas arma SQL y que `tickets.go:195` solo construye el mensaje de error HTTP. |
 
 **Resultado:** Todas las líneas de `auditoria.txt` fueron revisadas. Las consultas SQL/ORM pasan parámetros por separado y la concatenación con `+` en `internal/tickets/tickets.go:195` corresponde al mensaje de error HTTP (`respuesta.Error`), sin inyección SQL.
+
+## Prueba práctica
+
+Se probó la ruta real `GET /tickets/{id}` enviando como identificador el texto equivalente a:
+
+`' OR 1=1 --`
+
+La ruta convierte primero el parámetro `{id}` mediante `strconv.ParseUint`. Como el valor no es un entero positivo válido, la API respondió:
+
+`400 Bad Request`
+
+con el código:
+
+`id_invalido`
+
+La respuesta completa se guardó directamente desde `curl` en `docs/taller12/inyeccion.txt`.
+
+La solicitud no devolvió tickets ni información adicional y no llegó al repositorio como una condición SQL.

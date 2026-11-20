@@ -1,4 +1,4 @@
-﻿internal/almacen/almacen.go:74:	temporal := a.ruta + ".tmp"
+internal/almacen/almacen.go:74:	temporal := a.ruta + ".tmp"
 internal/almacen/filas/consultas.sql.go:19:	row := q.db.QueryRowContext(ctx, buscarPlan, id)
 internal/almacen/filas/consultas.sql.go:52:	result, err := q.db.ExecContext(ctx, guardarPlan,
 internal/almacen/filas/db.go:13:	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
