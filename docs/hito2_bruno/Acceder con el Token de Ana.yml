@@ -1,0 +1,18 @@
+info:
+  name: Acceder con el Token de Ana
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: http://127.0.0.1:8080/mascotas
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub21icmUiOiJBbmEgQ2xpZW50ZSIsInJvbCI6ImNsaWVudGUiLCJzdWIiOiIxIiwiZXhwIjoxNzk0NDU0MjAwLCJpYXQiOjE3OTQ0NTA2MDB9.ZfC3QqE3Wm-8CwYuOzhlRJkZiexOrWpD03n-WqCoEbA
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

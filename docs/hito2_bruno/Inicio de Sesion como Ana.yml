@@ -1,14 +1,11 @@
 info:
-  name: Peticion2-Login(obtener token)
+  name: Inicio de Sesion como Ana
   type: http
-  seq: 3
+  seq: 2
 
 http:
   method: POST
-  url: http://localhost:8080/login
-  headers:
-    - name: Content-Type
-      value: application/json
+  url: http://127.0.0.1:8080/login
   body:
     type: json
     data: |

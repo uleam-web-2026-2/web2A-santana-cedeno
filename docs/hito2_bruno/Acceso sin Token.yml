@@ -1,11 +1,11 @@
 info:
-  name: Peticion1-Listar mascotas (sin token)
+  name: Acceso sin Token
   type: http
-  seq: 2
+  seq: 1
 
 http:
   method: GET
-  url: http://localhost:8080/mascotas
+  url: http://127.0.0.1:8080/mascotas
   auth: inherit
 
 settings:

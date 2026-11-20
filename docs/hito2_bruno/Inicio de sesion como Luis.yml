@@ -1,19 +1,17 @@
 info:
-  name: Peticion0-Crear Usuario
+  name: Inicio de sesion como Luis
   type: http
-  seq: 1
+  seq: 5
 
 http:
   method: POST
-  url: http://localhost:8080/usuarios
+  url: http://127.0.0.1:8080/login
   body:
     type: json
-    data: |
+    data: |-
       {
-        "nombre": "Ana Cliente",
-        "correo": "ana@example.com",
-        "clave": "secreta",
-        "rol": "cliente"
+        "usuario": "Luis Veterinario",
+        "clave": "veterinario123"
       }
   auth: inherit
 
