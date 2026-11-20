@@ -1,3 +1,5 @@
+//go:build !migrar
+
 package main
 
 import (
@@ -25,14 +27,26 @@ func main() {
 
 	// CORS arriba de todo.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://localhost:5173"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Authorization", "Content-Type"},
-		MaxAge:         300,
+		AllowedOrigins: []string{
+			"http://localhost:5173",
+		},
+		AllowedMethods: []string{
+			"GET",
+			"POST",
+			"PUT",
+			"PATCH",
+			"DELETE",
+			"OPTIONS",
+		},
+		AllowedHeaders: []string{
+			"Authorization",
+			"Content-Type",
+		},
+		MaxAge: 300,
 	}))
 
 	// Obtiene la IP desde la conexión TCP.
-	// Esa IP se utilizará para limitar los intentos de login.
+	// Esta IP se utiliza para limitar los intentos de login.
 	r.Use(chimiddleware.ClientIPFromRemoteAddr)
 
 	r.Use(middleware.Registro)
@@ -88,7 +102,7 @@ func main() {
 	).Post("/login", manejadorSesion.Login)
 
 	// ---------------------------------------------------------
-	// Conexión a PostgreSQL
+	// Conexión normal de la API a PostgreSQL
 	// ---------------------------------------------------------
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -100,10 +114,10 @@ func main() {
 		log.Fatal("no se pudo conectar con PostgreSQL: ", err)
 	}
 
-	// GORM continúa creando y actualizando la tabla.
-	if err := db.AutoMigrate(&nutricion.PlanNutricional{}); err != nil {
-		log.Fatal("no se pudo migrar PlanNutricional: ", err)
-	}
+	// IMPORTANTE:
+	// La API ya no ejecuta AutoMigrate.
+	// Las migraciones se realizan por separado con migrar.go y
+	// DATABASE_ADMIN_URL, utilizando el usuario administrador.
 
 	// ---------------------------------------------------------
 	// Datos iniciales de prueba

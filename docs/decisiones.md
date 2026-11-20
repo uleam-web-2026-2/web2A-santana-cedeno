@@ -440,3 +440,73 @@ Los resultados quedaron registrados en `docs/taller12/peticiones.md`.
 Además, el límite del login se comprobó independientemente mediante seis intentos consecutivos con credenciales incorrectas. Los primeros cinco llegaron al login y el sexto fue detenido con `429 Too Many Requests` y la cabecera `Retry-After`.
 
 De esta manera, las nuevas defensas añadidas en la Semana 12 no modificaron el comportamiento esperado de las seis peticiones utilizadas como referencia.
+
+---
+
+## Semana 12 · reto: mínimo privilegio en la base
+
+### D5 · Con qué usuario se conecta la API
+
+Para la ejecución normal de la API se creó el usuario de PostgreSQL `nutricion_api`.
+
+Este usuario no es superusuario, no puede crear bases de datos ni roles y no es propietario de la tabla `plan_nutricionals`. La tabla continúa perteneciendo al usuario administrador `postgres`.
+
+Se concedieron únicamente los permisos necesarios para las operaciones actuales de la API:
+
+- `CONNECT` sobre la base `nutricion_mascotas`.
+- `USAGE` sobre el esquema `public`.
+- `SELECT`, `INSERT` y `UPDATE` sobre `plan_nutricionals`.
+- `USAGE` y `SELECT` sobre la secuencia `plan_nutricionals_id_seq`.
+
+No se concedieron permisos `DELETE`, `CREATE` ni `DROP`.
+
+Para comprobar el mínimo privilegio se intentó borrar `plan_nutricionals` utilizando `nutricion_api` dentro de una transacción. PostgreSQL respondió:
+
+`ERROR: must be owner of table plan_nutricionals`
+
+La evidencia real quedó guardada en `docs/taller12/reto_drop.txt`.
+
+También se guardó `docs/taller12/reto_usuarios.txt`, donde se observa que `postgres` conserva los privilegios administrativos y `nutricion_api` no tiene atributos especiales.
+
+Finalmente, se arrancó la API utilizando `nutricion_api` y las seis peticiones conservaron los códigos esperados: `401`, `200`, `200`, `403`, `200` y `422`.
+
+### D6 · Quién crea y cambia las tablas
+
+La ejecución normal de la API ya no realiza `AutoMigrate`.
+
+Se separó la responsabilidad de modificar el esquema de la base de datos mediante `migrar.go`. Este archivo utiliza la variable `DATABASE_ADMIN_URL` y se ejecuta con:
+
+`go run -tags migrar .`
+
+Para esta operación se utiliza el usuario administrador `postgres`, que continúa siendo propietario de `plan_nutricionals`.
+
+La API normal utiliza `DATABASE_URL` y se conecta como `nutricion_api`, que no es propietario de la tabla y no tiene permisos para crear, borrar ni modificar su estructura.
+
+Se comprobó la migración por separado y el comando respondió:
+
+`migración completada correctamente`
+
+Por tanto, si en el futuro cambia el modelo `PlanNutricional`, primero debe ejecutarse la migración con el usuario administrador. Arrancar únicamente la API con `nutricion_api` no debe modificar automáticamente el esquema de PostgreSQL.
+
+### D7 · Lo que esto no frena
+
+El principio de mínimo privilegio reduce el daño que podría causar un problema de seguridad en la API, pero no sustituye las demás defensas.
+
+Si en el futuro existiera una inyección SQL que consiguiera ejecutar operaciones con el usuario `nutricion_api`, ese usuario seguiría pudiendo realizar las operaciones para las que tiene permiso:
+
+- consultar registros de `plan_nutricionals`;
+- insertar nuevos planes nutricionales;
+- actualizar planes existentes;
+- utilizar la secuencia necesaria para generar identificadores.
+
+Sin embargo, `nutricion_api` no tiene permisos administrativos ni es propietario de la tabla.
+
+La prueba realizada demostró que no puede ejecutar:
+
+`DROP TABLE plan_nutricionals`
+
+PostgreSQL respondió:
+
+`ERROR: must be owner of table plan_nutricionals`
+
+Por tanto, el mínimo privilegio limita el alcance de un posible fallo, pero no evita por sí mismo una inyección SQL. Por esa razón se mantienen también las consultas parametrizadas y las demás defensas implementadas durante el taller.
