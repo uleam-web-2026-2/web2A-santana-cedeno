@@ -4,8 +4,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
@@ -21,6 +24,15 @@ func main() {
 
 	r.Use(middleware.Registro)
 	r.Use(middleware.Recuperacion)
+
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:5173"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		respuesta.Error(
@@ -66,7 +78,7 @@ func main() {
 		Tokens: tokens,
 	}
 
-	r.Post("/login", manejadorSesion.Login)
+	r.With(httprate.LimitByIP(5, time.Minute)).Post("/login", manejadorSesion.Login)
 
 	// ---------------------------------------------------------
 	// Conexión a PostgreSQL
