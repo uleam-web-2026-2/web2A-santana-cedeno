@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httprate"
 	"gorm.io/driver/postgres"
@@ -23,15 +24,16 @@ func main() {
 	r := chi.NewRouter()
 
 	// CORS arriba de todo.
-	// Para el taller se permite únicamente el origen de desarrollo indicado.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
+		AllowedOrigins: []string{"http://localhost:5173"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Authorization", "Content-Type"},
+		MaxAge:         300,
 	}))
+
+	// Obtiene la IP desde la conexión TCP.
+	// Esa IP se utilizará para limitar los intentos de login.
+	r.Use(chimiddleware.ClientIPFromRemoteAddr)
 
 	r.Use(middleware.Registro)
 	r.Use(middleware.Recuperacion)
@@ -80,8 +82,10 @@ func main() {
 		Tokens: tokens,
 	}
 
-	r.With(httprate.LimitByIP(5, time.Minute)).
-		Post("/login", manejadorSesion.Login)
+	// Pública, pero limitada a 5 intentos por minuto por IP.
+	r.With(
+		httprate.LimitBy(5, time.Minute, porIP),
+	).Post("/login", manejadorSesion.Login)
 
 	// ---------------------------------------------------------
 	// Conexión a PostgreSQL
@@ -169,4 +173,11 @@ func main() {
 
 	log.Println("Servidor mesa de ayuda en :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+// porIP obtiene la IP que ClientIPFromRemoteAddr dejó en el contexto
+// y la utiliza como clave del limitador.
+func porIP(r *http.Request) (string, error) {
+	ip := chimiddleware.GetClientIP(r.Context())
+	return httprate.CanonicalizeIP(ip), nil
 }

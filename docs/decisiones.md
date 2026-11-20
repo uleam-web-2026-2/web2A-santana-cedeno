@@ -350,3 +350,93 @@ Estos códigos coinciden con los obtenidos anteriormente mediante `go run` y med
 Los resultados quedaron registrados en `docs/taller11/peticiones.md` y los registros de la API y PostgreSQL quedaron guardados en `docs/taller11/compose_log.txt`.
 
 Por tanto, el comportamiento observable de la API se mantuvo al ejecutar la API y PostgreSQL juntos mediante Docker Compose.
+
+---
+
+## Semana 12 · Seguridad
+### D1 · Auditoría de inyección
+
+Se realizó una búsqueda del código del proyecto utilizando los patrones definidos en `docs/taller12/patrones.txt`.
+
+La salida se guardó en `docs/taller12/auditoria.txt` y se revisaron las coincidencias encontradas para distinguir cuáles estaban relacionadas con consultas SQL y cuáles correspondían únicamente a operaciones normales de Go.
+
+Las consultas generadas por sqlc pasan los valores como argumentos separados y el repositorio GORM utiliza un identificador de tipo `uint` en `First`, sin construir la consulta mediante concatenación de texto.
+
+También se comprobó que el filtro `estado` encontrado en el módulo de tickets trabaja sobre un repositorio en memoria y no construye una consulta SQL.
+
+Como comprobación práctica se envió a la ruta real `/tickets/{id}` un valor equivalente a `' OR 1=1 --`. La API respondió `400 Bad Request` con el código `id_invalido`, sin devolver tickets ni información adicional.
+
+La respuesta real de esta prueba quedó guardada en `docs/taller12/inyeccion.txt`.
+
+### D2 · Política CORS
+
+Se configuró CORS como middleware superior del router, inmediatamente después de `chi.NewRouter()`.
+
+Para las pruebas del taller se definió únicamente el origen:
+
+`http://localhost:5173`
+
+No se utilizó `*`.
+
+Se realizaron tres comprobaciones:
+
+1. Una petición previa `OPTIONS` desde `http://localhost:5173` respondió `200 OK` e incluyó `Access-Control-Allow-Origin: http://localhost:5173`.
+
+2. La misma petición desde `http://ejemplo-no-permitido.test` no incluyó la cabecera `Access-Control-Allow-Origin`.
+
+3. Una petición normal realizada con `curl` sin cabecera `Origin` continuó funcionando y respondió `200 OK`.
+
+Las salidas reales quedaron guardadas en:
+
+- `docs/taller12/cors_permitido.txt`
+- `docs/taller12/cors_no_permitido.txt`
+- `docs/taller12/cors_sin_origin.txt`
+
+De esta manera, la API no utiliza un origen abierto con `*` y solo concede autorización CORS al origen configurado para las pruebas del taller.
+
+### D3 · Límite de intentos en el login
+
+Se protegió únicamente la ruta pública `POST /login` con un límite de 5 solicitudes por minuto por IP.
+
+La IP del cliente se obtiene desde la conexión mediante `ClientIPFromRemoteAddr`. Después, la función `porIP` utiliza esa IP como clave del limitador.
+
+Para comprobar la defensa se realizaron seis intentos consecutivos de inicio de sesión utilizando una contraseña incorrecta.
+
+Los primeros cinco intentos llegaron al login y respondieron `401 Unauthorized`.
+
+El sexto intento fue detenido por el limitador y respondió:
+
+`429 Too Many Requests`
+
+Además, la respuesta incluyó:
+
+`Retry-After: 60`
+
+La salida real de los seis intentos quedó guardada en:
+
+`docs/taller12/limite_login.txt`
+
+Después de esta prueba se reinició el servidor y se volvieron a ejecutar las seis peticiones del Hito 2 para comprobar que el límite del login no alteró el comportamiento esperado del resto de la API.
+
+### D4 · Comprobación de las defensas
+
+Después de aplicar las defensas de inyección, CORS y límite de intentos en el login, se volvieron a ejecutar las seis peticiones utilizadas como línea base del Hito 2.
+
+Los resultados fueron:
+
+| Petición | Antes (taller 11) | Con las defensas |
+| --- | --- | --- |
+| Sin token | 401 | 401 |
+| Login | 200 | 200 |
+| Con token | 200 | 200 |
+| Rol sin permiso | 403 | 403 |
+| Cambio permitido | 200 | 200 |
+| Transición prohibida | 422 | 422 |
+
+Los mismos códigos HTTP se mantuvieron después de aplicar las nuevas defensas.
+
+Los resultados quedaron registrados en `docs/taller12/peticiones.md`.
+
+Además, el límite del login se comprobó independientemente mediante seis intentos consecutivos con credenciales incorrectas. Los primeros cinco llegaron al login y el sexto fue detenido con `429 Too Many Requests` y la cabecera `Retry-After`.
+
+De esta manera, las nuevas defensas añadidas en la Semana 12 no modificaron el comportamiento esperado de las seis peticiones utilizadas como referencia.
