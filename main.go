@@ -22,17 +22,19 @@ import (
 func main() {
 	r := chi.NewRouter()
 
-	r.Use(middleware.Registro)
-	r.Use(middleware.Recuperacion)
-
+	// CORS arriba de todo.
+	// Para el taller se permite únicamente el origen de desarrollo indicado.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:5173"},
+		AllowedOrigins:   []string{"http://localhost:5173"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	r.Use(middleware.Registro)
+	r.Use(middleware.Recuperacion)
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		respuesta.Error(
@@ -78,7 +80,8 @@ func main() {
 		Tokens: tokens,
 	}
 
-	r.With(httprate.LimitByIP(5, time.Minute)).Post("/login", manejadorSesion.Login)
+	r.With(httprate.LimitByIP(5, time.Minute)).
+		Post("/login", manejadorSesion.Login)
 
 	// ---------------------------------------------------------
 	// Conexión a PostgreSQL
